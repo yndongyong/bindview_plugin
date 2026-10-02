@@ -7,15 +7,11 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.yndongyong.bindview.model.ViewInfo
-import com.yndongyong.bindview.settings.BindViewSettings
 import com.yndongyong.bindview.utils.getKotlinClass
-import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtBlockExpression
-import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtPsiFactory
-import org.jetbrains.kotlin.resolve.ImportPath
 
 /**
  * 辅助将生成的 bindView 属性或局部变量写入 Kotlin 类文件
@@ -69,11 +65,12 @@ class KtFileWriteHelper(
         WriteCommandAction.runWriteCommandAction(project) {
             val psiFactory = KtPsiFactory(project)
 
-            // 1. 添加自动导入
-            addImportIfNeeded(ktFile, psiFactory)
+            // 1. 添加自动导入（包含 bindView 与 Custom View / AndroidX 导包，严格防重复）
+            ImportHelper.addImportsIfNeeded(project, ktFile, psiFactory, selectedViews, includeBindView = true)
 
             // 2. 写入类属性
-            val existingProperties = body.declarations.filterIsInstance<KtProperty>()
+            val declarations = ktClass.declarations
+            val existingProperties = declarations.filterIsInstance<KtProperty>()
             val existingNames = existingProperties.mapNotNull { it.name }.toSet()
 
             val newPropertyList = selectedViews.map { viewInfo ->
@@ -84,24 +81,75 @@ class KtFileWriteHelper(
                 return@runWriteCommandAction
             }
 
-            // 确定插入锚点（有属性则追加在最后一个属性后面，无属性则在 '{' 后面）
-            val anchor: PsiElement = existingProperties.lastOrNull() ?: body.lBrace ?: body
-
-            // 上方增加空行（两个换行）
-            var current: PsiElement = body.addAfter(psiFactory.createNewLine(2), anchor)
-
-            // 依次插入各个属性，属性之间单换行
             val insertedProperties = mutableListOf<KtProperty>()
-            for (prop in newPropertyList) {
-                val added = body.addAfter(prop, current) as KtProperty
-                insertedProperties.add(added)
-                current = body.addAfter(psiFactory.createNewLine(1), added)
+            var anchor: org.jetbrains.kotlin.psi.KtDeclaration? = existingProperties.lastOrNull()
+
+            if (anchor != null) {
+                // 2.1 类中已有属性：依次追加在最后一个已有属性之后
+                for (prop in newPropertyList) {
+                    val added = ktClass.addDeclarationAfter(prop, anchor!!) as KtProperty
+                    insertedProperties.add(added)
+                    anchor = added
+                }
+            } else {
+                // 2.2 类中尚无属性：优先插入在类体开头的首个声明之前（如在 onCreate 函数之前）
+                val firstDecl = declarations.firstOrNull()
+                if (firstDecl != null) {
+                    val firstProp = newPropertyList.first()
+                    val firstAdded = ktClass.addDeclarationBefore(firstProp, firstDecl) as KtProperty
+                    insertedProperties.add(firstAdded)
+                    anchor = firstAdded
+
+                    for (i in 1 until newPropertyList.size) {
+                        val prop = newPropertyList[i]
+                        val added = ktClass.addDeclarationAfter(prop, anchor!!) as KtProperty
+                        insertedProperties.add(added)
+                        anchor = added
+                    }
+                } else {
+                    // 2.3 类体完全为空：直接添加到类中
+                    for (prop in newPropertyList) {
+                        val added = if (anchor == null) {
+                            ktClass.addDeclaration(prop) as KtProperty
+                        } else {
+                            ktClass.addDeclarationAfter(prop, anchor!!) as KtProperty
+                        }
+                        insertedProperties.add(added)
+                        anchor = added
+                    }
+                }
             }
 
-            // 下方增加空行（再加一个换行）
-            body.addAfter(psiFactory.createNewLine(1), current)
+            // 3. 上下各保留一行空行
+            if (insertedProperties.isNotEmpty()) {
+                val firstInserted = insertedProperties.first()
+                val lastInserted = insertedProperties.last()
+                val classBody = ktClass.body
 
-            // 自动代码格式化与缩进对齐
+                if (classBody != null) {
+                    val prev = firstInserted.prevSibling
+                    if (prev is com.intellij.psi.PsiWhiteSpace) {
+                        val newlines = prev.text.count { it == '\n' }
+                        if (newlines < 2) {
+                            classBody.addBefore(psiFactory.createNewLine(2 - newlines), firstInserted)
+                        }
+                    } else {
+                        classBody.addBefore(psiFactory.createNewLine(2), firstInserted)
+                    }
+
+                    val next = lastInserted.nextSibling
+                    if (next is com.intellij.psi.PsiWhiteSpace) {
+                        val newlines = next.text.count { it == '\n' }
+                        if (newlines < 2) {
+                            classBody.addAfter(psiFactory.createNewLine(2 - newlines), lastInserted)
+                        }
+                    } else {
+                        classBody.addAfter(psiFactory.createNewLine(2), lastInserted)
+                    }
+                }
+            }
+
+            // 4. 自动代码格式化与缩进对齐
             val codeStyleManager = CodeStyleManager.getInstance(project)
             for (prop in insertedProperties) {
                 codeStyleManager.reformat(prop)
@@ -114,6 +162,9 @@ class KtFileWriteHelper(
     private fun executeWriteLocalVariables(ktFile: KtFile, selectedViews: List<ViewInfo>): Boolean {
         WriteCommandAction.runWriteCommandAction(project) {
             val psiFactory = KtPsiFactory(project)
+
+            // 1. 添加自动导入（针对局部变量中使用的 Custom View / AndroidX 类，严格防重复）
+            ImportHelper.addImportsIfNeeded(project, ktFile, psiFactory, selectedViews, includeBindView = false)
 
             // 找到光标所在处的代码块
             var elementAtOffset = ktFile.findElementAt(offset)
@@ -154,23 +205,43 @@ class KtFileWriteHelper(
 
             if (newPropertyList.isEmpty()) return@runWriteCommandAction
 
-            // 插入位置：优先在 anchorStatement 之后插入
-            val anchor = anchorStatement ?: block.lBrace ?: block
-
-            // 上方增加空行
-            var current: PsiElement = block.addAfter(psiFactory.createNewLine(2), anchor)
+            // 插入位置：优先在 anchorStatement 之后插入，没有则在 block.lBrace 之后
+            var anchor: PsiElement = anchorStatement ?: block.lBrace ?: block
 
             val insertedProperties = mutableListOf<KtProperty>()
             for (prop in newPropertyList) {
-                val added = block.addAfter(prop, current) as KtProperty
+                val added = block.addAfter(prop, anchor) as KtProperty
                 insertedProperties.add(added)
-                current = block.addAfter(psiFactory.createNewLine(1), added)
+                anchor = added
             }
 
-            // 下方增加空行
-            block.addAfter(psiFactory.createNewLine(1), current)
+            // 3. 上下各保留一行空行
+            if (insertedProperties.isNotEmpty()) {
+                val firstInserted = insertedProperties.first()
+                val lastInserted = insertedProperties.last()
 
-            // 自动缩进对齐格式化
+                val prev = firstInserted.prevSibling
+                if (prev is com.intellij.psi.PsiWhiteSpace) {
+                    val newlines = prev.text.count { it == '\n' }
+                    if (newlines < 2) {
+                        block.addBefore(psiFactory.createNewLine(2 - newlines), firstInserted)
+                    }
+                } else {
+                    block.addBefore(psiFactory.createNewLine(2), firstInserted)
+                }
+
+                val next = lastInserted.nextSibling
+                if (next is com.intellij.psi.PsiWhiteSpace) {
+                    val newlines = next.text.count { it == '\n' }
+                    if (newlines < 2) {
+                        block.addAfter(psiFactory.createNewLine(2 - newlines), lastInserted)
+                    }
+                } else {
+                    block.addAfter(psiFactory.createNewLine(2), lastInserted)
+                }
+            }
+
+            // 4. 自动缩进对齐格式化
             val codeStyleManager = CodeStyleManager.getInstance(project)
             for (prop in insertedProperties) {
                 codeStyleManager.reformat(prop)
@@ -178,27 +249,5 @@ class KtFileWriteHelper(
         }
 
         return true
-    }
-
-    private fun addImportIfNeeded(ktFile: KtFile, psiFactory: KtPsiFactory) {
-        val targetImport = BindViewSettings.getInstance().getEffectiveImportPath()
-        val wildcardImport = targetImport.substringBeforeLast(".") + ".*"
-
-        val hasImport = ktFile.importDirectives.any { directive ->
-            val path = directive.importPath?.pathStr
-            path == targetImport || path == wildcardImport
-        }
-        if (!hasImport) {
-            val importDirective = psiFactory.createImportDirective(ImportPath(FqName(targetImport), false))
-            val importList = ktFile.importList
-            if (importList != null) {
-                importList.add(importDirective)
-            } else {
-                ktFile.packageDirective?.let { pkg ->
-                    ktFile.addAfter(psiFactory.createNewLine(2), pkg)
-                    ktFile.addAfter(importDirective, pkg)
-                }
-            }
-        }
     }
 }

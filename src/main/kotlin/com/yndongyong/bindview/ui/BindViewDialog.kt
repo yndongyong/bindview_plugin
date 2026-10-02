@@ -51,8 +51,8 @@ class BindViewDialog(
     private val addMCheckBox = JBCheckBox("add \"m\"", settings.isAddM)
     private val isCamelCaseCheckBox = JBCheckBox("isCamelCase", settings.isCamelCase)
 
-    // 局部变量 (findViewById) 配置项
-    private val isLocalVariableCheckBox = JBCheckBox("Local Variable (findViewById)", settings.isLocalVariable)
+    // 局部变量 (findViewById) 配置项：默认关闭，始终以类属性模式 (by bindView) 为默认第一选项
+    private val isLocalVariableCheckBox = JBCheckBox("Local Variable (findViewById)", false)
     private val prefixLabel = JLabel("Prefix:")
     private val prefixTextField = JBTextField(settings.localVariablePrefix, 8)
 
@@ -79,14 +79,14 @@ class BindViewDialog(
     init {
         title = if (isKotlinFile) "Generate BindView Code (Kotlin)" else "Generate BindView Code (XML)"
 
-        // 智能探测初值（若光标处于方法体或 lambda 闭包内，自动切换为局部变量模式）
+        // 默认始终为类属性委托模式 (by bindView)
+        isLocalVariableCheckBox.isSelected = false
+
+        // 探测上下文推荐前缀（供用户切换至局部模式时使用）
         if (isKotlinFile) {
             val inference = psiFile.inferContextScope(offset)
-            if (inference.isLocalScope) {
-                isLocalVariableCheckBox.isSelected = true
-                if (!inference.suggestedPrefix.isNullOrEmpty()) {
-                    prefixTextField.text = inference.suggestedPrefix
-                }
+            if (!inference.suggestedPrefix.isNullOrEmpty()) {
+                prefixTextField.text = inference.suggestedPrefix
             }
         }
 
@@ -238,6 +238,12 @@ class BindViewDialog(
     private fun initListeners() {
         // 模式切换联动
         isLocalVariableCheckBox.addActionListener {
+            if (isLocalVariableCheckBox.isSelected && prefixTextField.text.isBlank()) {
+                val inference = psiFile.inferContextScope(offset)
+                if (!inference.suggestedPrefix.isNullOrEmpty()) {
+                    prefixTextField.text = inference.suggestedPrefix
+                }
+            }
             updateLocalVariableUIState()
             updateGeneratedCode()
         }
@@ -398,7 +404,7 @@ class BindViewDialog(
     }
 
     private fun saveState() {
-        settings.isLocalVariable = isLocalVariableCheckBox.isSelected
+        settings.isLocalVariable = false
         settings.localVariablePrefix = prefixTextField.text.trim()
     }
 
