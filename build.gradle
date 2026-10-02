@@ -50,9 +50,11 @@ intellijPlatform {
         changeNotes = '''
         <b>1.0.0</b><br>
         <ul>
-            <li>支持通过 bindview 语法自动生成 Kotlin 属性委托视图绑定代码</li>
-            <li>支持 private、add "m"、isCamelCase 等选项配置与持久化</li>
-            <li>支持 XML 布局中一键复制，以及 Kotlin 类中直接生成/复制代码</li>
+            <li>支持通过 bindview 语法自动生成 Kotlin 属性委托视图绑定代码；</li>
+            <li>支持 Local Variable (findViewById) 局部变量模式及动态 Receiver 前缀与常用预设；</li>
+            <li>支持自定义宿主项目导包路径（默认 com.yndongyong.van.bindView）；</li>
+            <li>优化交互：Insert Code 仅在类属性模式下展示，Local Variable 模式下自动隐藏并以 Copy Code 作为默认主按钮；</li>
+            <li>插入代码块自动保持上下空行与缩进对齐。</li>
         </ul>
         '''
     }

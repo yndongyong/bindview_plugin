@@ -4,13 +4,25 @@
     <vendor email="yndongyong@gmail.com" url="https://yndongyong.github.io">yndongyong</vendor>
 
     <description><![CDATA[
-    自动生成基于 <b>bindview</b> SDK 的属性委托代码。<br>
+    专为 Android 打造的视图绑定代码自动生成插件，支持属性委托与局部变量双模式：<br>
     <ul>
-        <li>通过 <code>by bindView(R.id.xxx)</code> 语法统一 Activity、Fragment、自定义 View 及 ViewHolder 中的视图绑定。</li>
-        <li>支持 private、add "m"、isCamelCase 等命名控制选项。</li>
-        <li>支持在 XML 布局文件中快速复制代码，或在 Kotlin 类中一键生成属性并自动导入依赖。</li>
+        <li><b>类属性模式 (by bindView)</b>：通过 <code>by bindView(R.id.xxx)</code> 语法，统一 Activity、Fragment、自定义 View (ViewGroup) 以及 ViewHolder 中的视图绑定，支持在 Kotlin 类中一键安全插入属性（Insert Code）并自动增加上下空行。</li>
+        <li><b>局部变量模式 (findViewById)</b>：适用于各种高频列表闭包（如 <code>bindHor2 { ... }</code>）或方法内部，支持动态前缀（如 <code>this.</code>、<code>view.</code>、<code>rootView.</code>、<code>holder.itemView.</code> 或无前缀），智能上下文探测，并自动优化为一键复制代码（Copy Code）。</li>
+        <li><b>可配置导包路径</b>：导包语句完全可配置（默认 <code>com.yndongyong.van.bindView</code>），方便由宿主项目提供自定义实现，统一命名为 <code>bindView</code>。可在设置页或弹窗顶部即点即改。</li>
+        <li><b>精简命名的配置与持久化</b>：支持 <code>private</code>、<code>add "m"</code>、<code>isCamelCase</code> 联动控制，设置自动记忆，表格支持双击重命名与全选/反选。</li>
     </ul>
     ]]></description>
+
+    <change-notes><![CDATA[
+    <b>1.0.0</b><br>
+    <ul>
+        <li>初始版本发布：支持通过 bindview 语法自动生成 Kotlin 属性委托视图绑定代码；</li>
+        <li>支持 Local Variable (findViewById) 局部变量模式及动态 Receiver 前缀与常用预设；</li>
+        <li>支持自定义宿主项目导包路径（默认 com.yndongyong.van.bindView）；</li>
+        <li>优化交互：Insert Code 仅在类属性模式下展示，Local Variable 模式下自动隐藏并以 Copy Code 作为默认主按钮；</li>
+        <li>插入代码块自动保持上下空行与缩进对齐。</li>
+    </ul>
+    ]]></change-notes>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.androidstudio</depends>
@@ -34,7 +46,7 @@
         <action id="com.yndongyong.bindview.GenerateBindViewAction"
                 class="com.yndongyong.bindview.action.GenerateBindViewAction"
                 text="Generate BindView"
-                description="Generate bindView property delegation code"
+                description="Generate bindView property delegation or findViewById code"
                 icon="AllIcons.FileTypes.Xml">
             <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="GenerateGroup"/>
             <add-to-group group-id="GenerateGroup" anchor="first"/>
