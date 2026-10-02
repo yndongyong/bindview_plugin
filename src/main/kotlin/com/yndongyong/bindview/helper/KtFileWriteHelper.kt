@@ -55,7 +55,7 @@ class KtFileWriteHelper(
         WriteCommandAction.runWriteCommandAction(project) {
             val psiFactory = KtPsiFactory(project)
 
-            // 1. 添加自动导入 com.yndongyong.van.bindview.bindView
+            // 1. 添加自动导入 com.yndongyong.van.bindView
             addImportIfNeeded(psiFile, psiFactory)
 
             // 2. 写入类属性
@@ -98,9 +98,11 @@ class KtFileWriteHelper(
     }
 
     private fun addImportIfNeeded(ktFile: KtFile, psiFactory: KtPsiFactory) {
-        val targetImport = "com.yndongyong.van.bindview.bindView"
+        val targetImport = "com.yndongyong.van.bindView"
         val hasImport = ktFile.importDirectives.any { directive ->
-            directive.importPath?.pathStr == targetImport || directive.importPath?.pathStr == "com.yndongyong.van.bindview.*"
+            val path = directive.importPath?.pathStr
+            path == targetImport || path == "com.yndongyong.van.*" ||
+            path == "com.yndongyong.van.bindview.bindView" || path == "com.yndongyong.van.bindview.*"
         }
         if (!hasImport) {
             val importDirective = psiFactory.createImportDirective(ImportPath(FqName(targetImport), false))

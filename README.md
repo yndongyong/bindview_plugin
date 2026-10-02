@@ -20,7 +20,7 @@
 
 3. **双向高效触发**：
    - **XML 布局文件中触发**：在 XML 文件中点击右键菜单 `Generate BindView` 或按 `Ctrl + I`，解析布局中的控件列表，实时预览并一键复制代码（`Copy Code`）。
-   - **Kotlin 源码中触发**：在 Kotlin 类或选中的布局名处按 `Ctrl + I`，支持自动探测关联的布局 XML，除了复制代码外，还支持一键直接插入类属性（`Insert Code`），并自动添加 `import com.yndongyong.van.bindview.bindView`。
+   - **Kotlin 源码中触发**：在 Kotlin 类或选中的布局名处按 `Ctrl + I`，支持自动探测关联的布局 XML，除了复制代码外，还支持一键直接插入类属性（`Insert Code`），并自动添加 `import com.yndongyong.van.bindView`。
 
 4. **灵活的数据表格与快捷操作**：
    - 支持多选、反选（`Select All` / `Select None` / `Select Invert`）。
