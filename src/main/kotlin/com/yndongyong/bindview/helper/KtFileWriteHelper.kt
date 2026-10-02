@@ -101,8 +101,7 @@ class KtFileWriteHelper(
         val targetImport = "com.yndongyong.van.bindView"
         val hasImport = ktFile.importDirectives.any { directive ->
             val path = directive.importPath?.pathStr
-            path == targetImport || path == "com.yndongyong.van.*" ||
-            path == "com.yndongyong.van.bindview.bindView" || path == "com.yndongyong.van.bindview.*"
+            path == targetImport || path == "com.yndongyong.van.*"
         }
         if (!hasImport) {
             val importDirective = psiFactory.createImportDirective(ImportPath(FqName(targetImport), false))
