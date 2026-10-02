@@ -30,4 +30,18 @@ class ViewInfo(
         val privateModifier = if (isPrivate) "private " else ""
         return "${privateModifier}val $fieldName: $viewType by bindView($idRef)"
     }
+
+    /**
+     * 生成当前 View 的局部变量 findViewById 声明代码
+     * 例如：val coverImage = this.findViewById<AsyncImageView>(R.id.iv_scenic_live_play_item_cover)
+     * 或无前缀：val coverImage = findViewById<AsyncImageView>(R.id.iv_scenic_live_play_item_cover)
+     */
+    fun getLocalVariableCode(addM: Boolean, isCamelCase: Boolean, prefix: String): String {
+        val fieldName = getEffectiveFieldName(addM, isCamelCase)
+        val viewType = element.viewName ?: "View"
+        val idRef = element.fullID()
+        val cleanPrefix = prefix.trim()
+        val receiver = if (cleanPrefix.isNotEmpty()) "$cleanPrefix." else ""
+        return "val $fieldName = ${receiver}findViewById<$viewType>($idRef)"
+    }
 }

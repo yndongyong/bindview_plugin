@@ -98,3 +98,51 @@ fun PsiFile.findLayoutNameInContext(offset: Int): String? {
     }
     return null
 }
+
+/**
+ * 上下文推断结果
+ */
+data class ContextInference(
+    val isLocalScope: Boolean,
+    val suggestedPrefix: String?
+)
+
+/**
+ * 探测光标所在上下文，判断是否在方法或 Lambda 闭包中，并推测适用的前缀
+ */
+fun PsiFile.inferContextScope(offset: Int): ContextInference {
+    var psiElement = this.findElementAt(offset)
+    while (psiElement != null) {
+        if (psiElement is KtClass) {
+            // 已经回退到类级别，说明处在类成员变量区域
+            break
+        }
+        if (psiElement is org.jetbrains.kotlin.psi.KtLambdaExpression) {
+            val text = psiElement.text
+            val prefix = when {
+                text.contains("this: View") || text.contains("this:View") || text.contains("this ->") -> "this"
+                text.contains("view,") || text.contains("view ->") -> "view"
+                text.contains("rootView") -> "rootView"
+                text.contains("itemView") -> "itemView"
+                text.contains("holder") -> "holder.itemView"
+                else -> "this"
+            }
+            return ContextInference(isLocalScope = true, suggestedPrefix = prefix)
+        }
+        if (psiElement is org.jetbrains.kotlin.psi.KtNamedFunction) {
+            val fnName = psiElement.name ?: ""
+            val params = psiElement.valueParameters.mapNotNull { it.name }
+            val prefix = when {
+                params.contains("view") -> "view"
+                params.contains("rootView") -> "rootView"
+                params.contains("itemView") -> "itemView"
+                params.contains("holder") -> "holder.itemView"
+                fnName.contains("onViewCreated", ignoreCase = true) -> "view"
+                else -> null
+            }
+            return ContextInference(isLocalScope = true, suggestedPrefix = prefix)
+        }
+        psiElement = psiElement.parent
+    }
+    return ContextInference(isLocalScope = false, suggestedPrefix = null)
+}

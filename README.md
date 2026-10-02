@@ -23,7 +23,13 @@
    - **Kotlin 源码中触发**：在 Kotlin 类或选中的布局名处按 `Ctrl + I`，支持自动探测关联的布局 XML，除了复制代码外，还支持一键直接插入类属性（`Insert Code`），并自动添加 `import <配置的导包路径>`。
    - **支持自定义宿主项目导包**：导包路径完全可配置，默认 `com.yndongyong.van.bindView`。方便宿主项目提供自定义实现（方法名统一为 `bindView`）。可在 `Settings -> Tools -> BindView` 或直接在生成弹窗中快速配置。
 
-4. **灵活的数据表格与快捷操作**：
+4. **双模式支持（类属性委托 vs 局部变量 findViewById）**：
+   - **类属性模式**（默认）：生成 `private val tvTitle: TextView by bindView(R.id.tv_title)`，适用于 Activity/Fragment/ViewHolder 类。
+   - **局部变量模式**：生成 `val tvTitle = [prefix.]findViewById<TextView>(R.id.tv_title)`，适用于各种方法体或列表项闭包（如 `bindHor2 { ... }`）。
+   - **动态 Receiver 前缀**：支持自定义输入前缀（如 `this`、`rootView`、`holder.itemView` 或留空直接调用），并提供 `[this]`、`[(无前缀)]`、`[view]`、`[rootView]`、`[itemView]` 等快捷点击预设。
+   - **智能上下文探测**：若光标处于函数体或 Lambda 闭包中，自动切换至局部变量模式并智能推荐初值前缀。
+
+5. **灵活的数据表格与快捷操作**：
    - 支持多选、反选（`Select All` / `Select None` / `Select Invert`）。
    - 表格中支持双击直接自定义变量名称。
    - 自动递归解析 `<include layout="@layout/..."/>` 中的子布局控件。

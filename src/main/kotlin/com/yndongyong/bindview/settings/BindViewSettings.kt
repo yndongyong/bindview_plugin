@@ -21,6 +21,16 @@ class BindViewSettings : PersistentStateComponent<BindViewSettings> {
     var isCamelCase: Boolean = true
 
     /**
+     * 是否为局部变量模式 (findViewById)
+     */
+    var isLocalVariable: Boolean = false
+
+    /**
+     * 局部变量 findViewById 的调用前缀，例如 "this"、"view"、"rootView" 或 ""
+     */
+    var localVariablePrefix: String = "this"
+
+    /**
      * 导包语句配置，默认 com.yndongyong.van.bindView
      */
     var bindViewImportPath: String = DEFAULT_IMPORT_PATH

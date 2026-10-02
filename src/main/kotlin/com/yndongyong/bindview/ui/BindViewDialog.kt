@@ -7,25 +7,34 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.EditorFontType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.Messages
 import com.intellij.psi.PsiFile
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
+import com.intellij.ui.components.JBTextField
 import com.intellij.ui.table.JBTable
 import com.yndongyong.bindview.helper.KtFileWriteHelper
 import com.yndongyong.bindview.model.Element
 import com.yndongyong.bindview.model.ViewInfo
 import com.yndongyong.bindview.settings.BindViewSettings
+import com.yndongyong.bindview.utils.inferContextScope
 import java.awt.BorderLayout
+import java.awt.Cursor
 import java.awt.Dimension
 import java.awt.FlowLayout
+import java.awt.Font
+import java.awt.Insets
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.awt.event.ActionEvent
 import javax.swing.*
+import javax.swing.event.DocumentEvent
+import javax.swing.event.DocumentListener
 
 /**
- * BindView 代码生成弹窗
+ * BindView 代码生成弹窗，支持类属性委托 (by bindView) 与局部变量 (findViewById) 双模式
  */
 class BindViewDialog(
     private val project: Project,
@@ -37,10 +46,18 @@ class BindViewDialog(
 
     private val settings = BindViewSettings.getInstance()
 
-    // 顶部配置项
+    // 命名配置项
     private val isPrivateCheckBox = JBCheckBox("private", settings.isPrivate)
     private val addMCheckBox = JBCheckBox("add \"m\"", settings.isAddM)
     private val isCamelCaseCheckBox = JBCheckBox("isCamelCase", settings.isCamelCase)
+
+    // 局部变量 (findViewById) 配置项
+    private val isLocalVariableCheckBox = JBCheckBox("Local Variable (findViewById)", settings.isLocalVariable)
+    private val prefixLabel = JLabel("Prefix:")
+    private val prefixTextField = JBTextField(settings.localVariablePrefix, 8)
+
+    // 预设前缀按钮列表
+    private val presetButtons = mutableListOf<JButton>()
 
     // 数据列表与表格模型
     private val viewInfoList = elements.map { ViewInfo(isChecked = true, element = it) }
@@ -57,36 +74,52 @@ class BindViewDialog(
 
     init {
         title = if (isKotlinFile) "Generate BindView Code (Kotlin)" else "Generate BindView Code (XML)"
+
+        // 智能探测初值（若光标处于方法体或 lambda 闭包内，自动切换为局部变量模式）
+        if (isKotlinFile) {
+            val inference = psiFile.inferContextScope(offset)
+            if (inference.isLocalScope) {
+                isLocalVariableCheckBox.isSelected = true
+                if (!inference.suggestedPrefix.isNullOrEmpty()) {
+                    prefixTextField.text = inference.suggestedPrefix
+                }
+            }
+        }
+
         init()
     }
 
     override fun createCenterPanel(): JComponent {
         val rootPanel = JPanel(BorderLayout(0, 10))
-        rootPanel.preferredSize = Dimension(820, 560)
+        rootPanel.preferredSize = Dimension(860, 590)
 
-        // 1. 顶部控制栏 (右上角 private, add "m", isCamelCase)
-        val topPanel = JPanel(BorderLayout())
+        // 1. 顶部控制栏
+        val topPanel = JPanel()
+        topPanel.layout = BoxLayout(topPanel, BoxLayout.Y_AXIS)
+
+        // 第一行：标题、导包设置链接、以及右侧 private, add "m", isCamelCase
+        val row1 = JPanel(BorderLayout())
         val westPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0))
         val titleLabel = JLabel("BindView (Kotlin)")
-        titleLabel.font = titleLabel.font.deriveFont(java.awt.Font.BOLD)
+        titleLabel.font = titleLabel.font.deriveFont(Font.BOLD)
         westPanel.add(titleLabel)
 
         if (isKotlinFile) {
             val importLabel = JLabel("import ${settings.getEffectiveImportPath()}")
-            importLabel.foreground = com.intellij.ui.JBColor.GRAY
+            importLabel.foreground = JBColor.GRAY
             val editImportBtn = JButton("配置导包").apply {
                 isBorderPainted = false
                 isContentAreaFilled = false
-                foreground = com.intellij.ui.JBColor.blue
-                cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
-                margin = java.awt.Insets(0, 0, 0, 0)
+                foreground = JBColor.blue
+                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                margin = Insets(0, 0, 0, 0)
                 addActionListener {
                     val current = settings.bindViewImportPath
-                    val newPath = com.intellij.openapi.ui.Messages.showInputDialog(
+                    val newPath = Messages.showInputDialog(
                         rootPanel,
                         "请输入宿主项目提供的 bindView 完整导包路径（方法名必须为 bindView）：",
                         "配置 BindView 导包",
-                        com.intellij.openapi.ui.Messages.getQuestionIcon(),
+                        Messages.getQuestionIcon(),
                         current,
                         null
                     )
@@ -100,13 +133,46 @@ class BindViewDialog(
             westPanel.add(importLabel)
             westPanel.add(editImportBtn)
         }
-        topPanel.add(westPanel, BorderLayout.WEST)
+        row1.add(westPanel, BorderLayout.WEST)
 
         val optionsPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 15, 0))
         optionsPanel.add(isPrivateCheckBox)
         optionsPanel.add(addMCheckBox)
         optionsPanel.add(isCamelCaseCheckBox)
-        topPanel.add(optionsPanel, BorderLayout.EAST)
+        row1.add(optionsPanel, BorderLayout.EAST)
+        topPanel.add(row1)
+
+        topPanel.add(Box.createVerticalStrut(6))
+
+        // 第二行：Local Variable 模式与前缀输入框、快捷预设
+        val row2 = JPanel(FlowLayout(FlowLayout.LEFT, 8, 0))
+        row2.add(isLocalVariableCheckBox)
+        row2.add(prefixLabel)
+        prefixTextField.preferredSize = Dimension(110, 26)
+        row2.add(prefixTextField)
+
+        val presetLabel = JLabel("Presets:")
+        presetLabel.foreground = JBColor.GRAY
+        row2.add(presetLabel)
+
+        val presets = listOf("this", "(无前缀)", "view", "rootView", "itemView")
+        for (preset in presets) {
+            val btn = JButton(preset).apply {
+                isBorderPainted = false
+                isContentAreaFilled = false
+                foreground = JBColor.blue
+                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                margin = Insets(0, 2, 0, 2)
+                addActionListener {
+                    prefixTextField.text = if (preset == "(无前缀)") "" else preset
+                    updateGeneratedCode()
+                }
+            }
+            presetButtons.add(btn)
+            row2.add(btn)
+        }
+
+        topPanel.add(row2)
         rootPanel.add(topPanel, BorderLayout.NORTH)
 
         // 2. 中间区域：表格 + 全选按钮 + 代码预览
@@ -128,7 +194,7 @@ class BindViewDialog(
         viewTable.columnModel.getColumn(3).preferredWidth = 240
 
         val tableScrollPane = JBScrollPane(viewTable)
-        tableScrollPane.preferredSize = Dimension(800, 200)
+        tableScrollPane.preferredSize = Dimension(820, 200)
 
         // 表格操作按钮
         val buttonBar = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0))
@@ -145,15 +211,18 @@ class BindViewDialog(
         previewTextArea.font = font
         previewTextArea.rows = 8
         val codeScrollPane = JBScrollPane(previewTextArea)
-        codeScrollPane.preferredSize = Dimension(800, 180)
+        codeScrollPane.preferredSize = Dimension(820, 180)
 
         centerPanel.add(tableContainer, BorderLayout.CENTER)
         centerPanel.add(codeScrollPane, BorderLayout.SOUTH)
 
         rootPanel.add(centerPanel, BorderLayout.CENTER)
 
-        // 事件监听绑定
+        // 初始化组件联动与事件监听
         initListeners()
+
+        // 根据初始状态更新 UI 开关
+        updateLocalVariableUIState()
 
         // 初始生成代码
         updateGeneratedCode()
@@ -162,6 +231,19 @@ class BindViewDialog(
     }
 
     private fun initListeners() {
+        // 模式切换联动
+        isLocalVariableCheckBox.addActionListener {
+            updateLocalVariableUIState()
+            updateGeneratedCode()
+        }
+
+        // 前缀文本输入监听（实时刷新）
+        prefixTextField.document.addDocumentListener(object : DocumentListener {
+            override fun insertUpdate(e: DocumentEvent?) = updateGeneratedCode()
+            override fun removeUpdate(e: DocumentEvent?) = updateGeneratedCode()
+            override fun changedUpdate(e: DocumentEvent?) = updateGeneratedCode()
+        })
+
         // 复选框事件与联动
         isPrivateCheckBox.addActionListener {
             settings.isPrivate = isPrivateCheckBox.isSelected
@@ -202,6 +284,21 @@ class BindViewDialog(
         }
     }
 
+    private fun updateLocalVariableUIState() {
+        val isLocal = isLocalVariableCheckBox.isSelected
+        prefixLabel.isEnabled = isLocal
+        prefixTextField.isEnabled = isLocal
+        presetButtons.forEach { it.isEnabled = isLocal }
+
+        // 局部变量下不能声明 private，禁用 private 复选框
+        isPrivateCheckBox.isEnabled = !isLocal
+        if (isLocal) {
+            isPrivateCheckBox.isSelected = false
+        } else {
+            isPrivateCheckBox.isSelected = settings.isPrivate
+        }
+    }
+
     private fun syncSettingsAndRefresh() {
         settings.isAddM = addMCheckBox.isSelected
         settings.isCamelCase = isCamelCaseCheckBox.isSelected
@@ -215,11 +312,17 @@ class BindViewDialog(
         val addM = addMCheckBox.isSelected
         val isPrivate = isPrivateCheckBox.isSelected
         val isCamelCase = isCamelCaseCheckBox.isSelected
+        val isLocal = isLocalVariableCheckBox.isSelected
+        val prefix = prefixTextField.text.trim()
 
         val sb = StringBuilder()
         val checkedList = viewInfoList.filter { it.isChecked }
         for (item in checkedList) {
-            sb.append(item.getBindViewCode(addM, isPrivate, isCamelCase)).append("\n")
+            if (isLocal) {
+                sb.append(item.getLocalVariableCode(addM, isCamelCase, prefix)).append("\n")
+            } else {
+                sb.append(item.getBindViewCode(addM, isPrivate, isCamelCase)).append("\n")
+            }
         }
 
         previewTextArea.text = sb.toString().trimEnd()
@@ -233,9 +336,9 @@ class BindViewDialog(
         val actions = mutableListOf<Action>()
 
         if (isKotlinFile) {
-            // 在 Kotlin 文件中提供直接插入代码和复制两个选项
             val insertAction = object : DialogWrapperAction("Insert Code") {
                 override fun doAction(e: ActionEvent?) {
+                    saveState()
                     val success = KtFileWriteHelper(
                         project = project,
                         psiFile = psiFile,
@@ -243,10 +346,12 @@ class BindViewDialog(
                         viewInfos = viewInfoList,
                         addM = addMCheckBox.isSelected,
                         isPrivate = isPrivateCheckBox.isSelected,
-                        isCamelCase = isCamelCaseCheckBox.isSelected
+                        isCamelCase = isCamelCaseCheckBox.isSelected,
+                        isLocalVariable = isLocalVariableCheckBox.isSelected,
+                        prefix = prefixTextField.text.trim()
                     ).execute()
                     if (success) {
-                        showNotification("BindView code inserted successfully")
+                        showNotification("Code inserted successfully")
                         close(OK_EXIT_CODE)
                     }
                 }
@@ -257,8 +362,9 @@ class BindViewDialog(
 
         val copyAction = object : DialogWrapperAction("Copy Code") {
             override fun doAction(e: ActionEvent?) {
+                saveState()
                 copyCodeToClipboard()
-                showNotification("BindView code copied to clipboard")
+                showNotification("Code copied to clipboard")
                 close(OK_EXIT_CODE)
             }
         }
@@ -270,6 +376,11 @@ class BindViewDialog(
         actions.add(cancelAction)
 
         return actions.toTypedArray()
+    }
+
+    private fun saveState() {
+        settings.isLocalVariable = isLocalVariableCheckBox.isSelected
+        settings.localVariablePrefix = prefixTextField.text.trim()
     }
 
     private fun copyCodeToClipboard() {

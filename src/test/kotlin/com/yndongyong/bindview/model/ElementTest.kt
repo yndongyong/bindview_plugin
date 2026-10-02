@@ -93,4 +93,40 @@ class ElementTest {
         settings.bindViewImportPath = "   "
         assertEquals("com.yndongyong.van.bindView", settings.getEffectiveImportPath())
     }
+
+    @Test
+    fun testLocalVariableCodeGeneration() {
+        val elem = Element("com.example.AsyncImageView", "@+id/iv_scenic_live_play_item_cover")
+        val viewInfo = ViewInfo(isChecked = true, element = elem)
+
+        // 1. 带 this 前缀
+        assertEquals(
+            "val ivScenicLivePlayItemCover = this.findViewById<AsyncImageView>(R.id.iv_scenic_live_play_item_cover)",
+            viewInfo.getLocalVariableCode(addM = false, isCamelCase = true, prefix = "this")
+        )
+
+        // 2. 带 rootView 前缀
+        assertEquals(
+            "val ivScenicLivePlayItemCover = rootView.findViewById<AsyncImageView>(R.id.iv_scenic_live_play_item_cover)",
+            viewInfo.getLocalVariableCode(addM = false, isCamelCase = true, prefix = "rootView")
+        )
+
+        // 3. 带 holder.itemView 前缀
+        assertEquals(
+            "val ivScenicLivePlayItemCover = holder.itemView.findViewById<AsyncImageView>(R.id.iv_scenic_live_play_item_cover)",
+            viewInfo.getLocalVariableCode(addM = false, isCamelCase = true, prefix = "holder.itemView")
+        )
+
+        // 4. 无前缀（留空）
+        assertEquals(
+            "val ivScenicLivePlayItemCover = findViewById<AsyncImageView>(R.id.iv_scenic_live_play_item_cover)",
+            viewInfo.getLocalVariableCode(addM = false, isCamelCase = true, prefix = "")
+        )
+
+        // 5. 非驼峰
+        assertEquals(
+            "val iv_scenic_live_play_item_cover = this.findViewById<AsyncImageView>(R.id.iv_scenic_live_play_item_cover)",
+            viewInfo.getLocalVariableCode(addM = false, isCamelCase = false, prefix = "this")
+        )
+    }
 }

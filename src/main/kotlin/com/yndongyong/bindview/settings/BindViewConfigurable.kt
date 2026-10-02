@@ -17,6 +17,7 @@ class BindViewConfigurable : Configurable {
     private var isPrivateCheckBox: Cell<JBCheckBox>? = null
     private var isAddMCheckBox: Cell<JBCheckBox>? = null
     private var isCamelCaseCheckBox: Cell<JBCheckBox>? = null
+    private var defaultPrefixField: Cell<JBTextField>? = null
 
     override fun getDisplayName(): String = "BindView"
 
@@ -54,6 +55,14 @@ class BindViewConfigurable : Configurable {
                         it.component.isSelected = settings.isCamelCase
                     }
             }
+            row("默认局部变量调用前缀:") {
+                defaultPrefixField = textField()
+                    .comment("用于局部变量模式下 findViewById 的前缀对象，例如 this、view 或留空")
+                    .also {
+                        it.component.text = settings.localVariablePrefix
+                        it.component.columns = 15
+                    }
+            }
         }
 
         // 联动逻辑
@@ -71,7 +80,9 @@ class BindViewConfigurable : Configurable {
 
     override fun isModified(): Boolean {
         val currentImport = importPathField?.component?.text?.trim() ?: ""
+        val currentPrefix = defaultPrefixField?.component?.text?.trim() ?: ""
         return currentImport != settings.bindViewImportPath ||
+                currentPrefix != settings.localVariablePrefix ||
                 isPrivateCheckBox?.component?.isSelected != settings.isPrivate ||
                 isAddMCheckBox?.component?.isSelected != settings.isAddM ||
                 isCamelCaseCheckBox?.component?.isSelected != settings.isCamelCase
@@ -91,6 +102,7 @@ class BindViewConfigurable : Configurable {
             importPathField?.component?.text = BindViewSettings.DEFAULT_IMPORT_PATH
         }
 
+        settings.localVariablePrefix = defaultPrefixField?.component?.text?.trim() ?: ""
         settings.isPrivate = isPrivateCheckBox?.component?.isSelected ?: true
         settings.isAddM = isAddMCheckBox?.component?.isSelected ?: false
         settings.isCamelCase = isCamelCaseCheckBox?.component?.isSelected ?: true
@@ -98,6 +110,7 @@ class BindViewConfigurable : Configurable {
 
     override fun reset() {
         importPathField?.component?.text = settings.bindViewImportPath
+        defaultPrefixField?.component?.text = settings.localVariablePrefix
         isPrivateCheckBox?.component?.isSelected = settings.isPrivate
         isAddMCheckBox?.component?.isSelected = settings.isAddM
         isCamelCaseCheckBox?.component?.isSelected = settings.isCamelCase
