@@ -66,9 +66,41 @@ class BindViewDialog(
 
         // 1. 顶部控制栏 (右上角 private, add "m", isCamelCase)
         val topPanel = JPanel(BorderLayout())
+        val westPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0))
         val titleLabel = JLabel("BindView (Kotlin)")
         titleLabel.font = titleLabel.font.deriveFont(java.awt.Font.BOLD)
-        topPanel.add(titleLabel, BorderLayout.WEST)
+        westPanel.add(titleLabel)
+
+        if (isKotlinFile) {
+            val importLabel = JLabel("import ${settings.getEffectiveImportPath()}")
+            importLabel.foreground = com.intellij.ui.JBColor.GRAY
+            val editImportBtn = JButton("配置导包").apply {
+                isBorderPainted = false
+                isContentAreaFilled = false
+                foreground = com.intellij.ui.JBColor.blue
+                cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+                margin = java.awt.Insets(0, 0, 0, 0)
+                addActionListener {
+                    val current = settings.bindViewImportPath
+                    val newPath = com.intellij.openapi.ui.Messages.showInputDialog(
+                        rootPanel,
+                        "请输入宿主项目提供的 bindView 完整导包路径（方法名必须为 bindView）：",
+                        "配置 BindView 导包",
+                        com.intellij.openapi.ui.Messages.getQuestionIcon(),
+                        current,
+                        null
+                    )
+                    if (!newPath.isNullOrBlank()) {
+                        val formatted = if (newPath.trim().endsWith(".bindView")) newPath.trim() else "${newPath.trim()}.bindView"
+                        settings.bindViewImportPath = formatted
+                        importLabel.text = "import $formatted"
+                    }
+                }
+            }
+            westPanel.add(importLabel)
+            westPanel.add(editImportBtn)
+        }
+        topPanel.add(westPanel, BorderLayout.WEST)
 
         val optionsPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 15, 0))
         optionsPanel.add(isPrivateCheckBox)

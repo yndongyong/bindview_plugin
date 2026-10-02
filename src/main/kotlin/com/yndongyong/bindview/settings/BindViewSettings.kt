@@ -20,6 +20,26 @@ class BindViewSettings : PersistentStateComponent<BindViewSettings> {
 
     var isCamelCase: Boolean = true
 
+    /**
+     * 导包语句配置，默认 com.yndongyong.van.bindView
+     */
+    var bindViewImportPath: String = DEFAULT_IMPORT_PATH
+
+    /**
+     * 获取规范化后的有效导入路径（确保以 .bindView 结尾）
+     */
+    fun getEffectiveImportPath(): String {
+        val trimmed = bindViewImportPath.trim()
+        if (trimmed.isEmpty()) {
+            return DEFAULT_IMPORT_PATH
+        }
+        return if (trimmed.endsWith(".bindView")) {
+            trimmed
+        } else {
+            "$trimmed.bindView"
+        }
+    }
+
     override fun getState(): BindViewSettings {
         return this
     }
@@ -29,6 +49,8 @@ class BindViewSettings : PersistentStateComponent<BindViewSettings> {
     }
 
     companion object {
+        const val DEFAULT_IMPORT_PATH = "com.yndongyong.van.bindView"
+
         fun getInstance(): BindViewSettings {
             return ApplicationManager.getApplication().getService(BindViewSettings::class.java)
         }

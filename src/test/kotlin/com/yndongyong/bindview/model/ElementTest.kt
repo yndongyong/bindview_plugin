@@ -74,4 +74,23 @@ class ElementTest {
             viewInfo.getBindViewCode(addM = false, isPrivate = true, isCamelCase = true)
         )
     }
+
+    @Test
+    fun testImportPathConfiguration() {
+        val settings = com.yndongyong.bindview.settings.BindViewSettings()
+        // 默认
+        assertEquals("com.yndongyong.van.bindView", settings.getEffectiveImportPath())
+
+        // 自定义全称
+        settings.bindViewImportPath = "com.custom.ui.bindView"
+        assertEquals("com.custom.ui.bindView", settings.getEffectiveImportPath())
+
+        // 仅包名（自动补齐 .bindView）
+        settings.bindViewImportPath = "com.custom.ui"
+        assertEquals("com.custom.ui.bindView", settings.getEffectiveImportPath())
+
+        // 空格与空字符串处理
+        settings.bindViewImportPath = "   "
+        assertEquals("com.yndongyong.van.bindView", settings.getEffectiveImportPath())
+    }
 }

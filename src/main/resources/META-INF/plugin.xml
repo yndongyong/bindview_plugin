@@ -18,6 +18,14 @@
     <depends>org.jetbrains.kotlin</depends>
     <depends>com.intellij.modules.xml</depends>
 
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationConfigurable
+                instance="com.yndongyong.bindview.settings.BindViewConfigurable"
+                id="com.yndongyong.bindview.settings.BindViewConfigurable"
+                parentId="tools"
+                displayName="BindView"/>
+    </extensions>
+
     <extensions defaultExtensionNs="org.jetbrains.kotlin">
         <supportsKotlinPluginMode supportsK2="true"/>
     </extensions>

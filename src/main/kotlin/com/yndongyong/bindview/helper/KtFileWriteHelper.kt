@@ -7,6 +7,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.yndongyong.bindview.model.ViewInfo
+import com.yndongyong.bindview.settings.BindViewSettings
 import com.yndongyong.bindview.utils.getKotlinClass
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtClass
@@ -98,10 +99,12 @@ class KtFileWriteHelper(
     }
 
     private fun addImportIfNeeded(ktFile: KtFile, psiFactory: KtPsiFactory) {
-        val targetImport = "com.yndongyong.van.bindView"
+        val targetImport = BindViewSettings.getInstance().getEffectiveImportPath()
+        val wildcardImport = targetImport.substringBeforeLast(".") + ".*"
+
         val hasImport = ktFile.importDirectives.any { directive ->
             val path = directive.importPath?.pathStr
-            path == targetImport || path == "com.yndongyong.van.*"
+            path == targetImport || path == wildcardImport
         }
         if (!hasImport) {
             val importDirective = psiFactory.createImportDirective(ImportPath(FqName(targetImport), false))
