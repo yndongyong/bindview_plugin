@@ -72,6 +72,10 @@ class BindViewDialog(
     // 代码预览框
     private val previewTextArea = JBTextArea()
 
+    // 底部 Action 引用
+    private var insertAction: DialogWrapperAction? = null
+    private lateinit var copyAction: DialogWrapperAction
+
     init {
         title = if (isKotlinFile) "Generate BindView Code (Kotlin)" else "Generate BindView Code (XML)"
 
@@ -87,6 +91,7 @@ class BindViewDialog(
         }
 
         init()
+        updateLocalVariableUIState()
     }
 
     override fun createCenterPanel(): JComponent {
@@ -297,6 +302,19 @@ class BindViewDialog(
         } else {
             isPrivateCheckBox.isSelected = settings.isPrivate
         }
+
+        // 只有类属性模式下才显示 Insert Code 按钮，Local Variable 模式下隐藏/不要
+        if (isKotlinFile && insertAction != null) {
+            val insertBtn = getButton(insertAction!!)
+            val copyBtn = getButton(copyAction)
+            if (isLocal) {
+                insertBtn?.isVisible = false
+                copyBtn?.let { rootPane?.defaultButton = it }
+            } else {
+                insertBtn?.isVisible = true
+                insertBtn?.let { rootPane?.defaultButton = it }
+            }
+        }
     }
 
     private fun syncSettingsAndRefresh() {
@@ -336,7 +354,7 @@ class BindViewDialog(
         val actions = mutableListOf<Action>()
 
         if (isKotlinFile) {
-            val insertAction = object : DialogWrapperAction("Insert Code") {
+            val action = object : DialogWrapperAction("Insert Code") {
                 override fun doAction(e: ActionEvent?) {
                     saveState()
                     val success = KtFileWriteHelper(
@@ -347,8 +365,8 @@ class BindViewDialog(
                         addM = addMCheckBox.isSelected,
                         isPrivate = isPrivateCheckBox.isSelected,
                         isCamelCase = isCamelCaseCheckBox.isSelected,
-                        isLocalVariable = isLocalVariableCheckBox.isSelected,
-                        prefix = prefixTextField.text.trim()
+                        isLocalVariable = false,
+                        prefix = ""
                     ).execute()
                     if (success) {
                         showNotification("Code inserted successfully")
@@ -356,11 +374,12 @@ class BindViewDialog(
                     }
                 }
             }
-            insertAction.putValue(DEFAULT_ACTION, true)
-            actions.add(insertAction)
+            action.putValue(DEFAULT_ACTION, true)
+            insertAction = action
+            actions.add(action)
         }
 
-        val copyAction = object : DialogWrapperAction("Copy Code") {
+        copyAction = object : DialogWrapperAction("Copy Code") {
             override fun doAction(e: ActionEvent?) {
                 saveState()
                 copyCodeToClipboard()
