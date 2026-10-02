@@ -1,0 +1,37 @@
+<idea-plugin>
+    <id>com.yndongyong.bindview</id>
+    <name>BindView</name>
+    <vendor email="yndongyong@gmail.com" url="https://yndongyong.github.io">yndongyong</vendor>
+
+    <description><![CDATA[
+    自动生成基于 <b>bindview</b> SDK 的属性委托代码。<br>
+    <ul>
+        <li>通过 <code>by bindView(R.id.xxx)</code> 语法统一 Activity、Fragment、自定义 View 及 ViewHolder 中的视图绑定。</li>
+        <li>支持 private、add "m"、isCamelCase 等命名控制选项。</li>
+        <li>支持在 XML 布局文件中快速复制代码，或在 Kotlin 类中一键生成属性并自动导入依赖。</li>
+    </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.androidstudio</depends>
+    <depends>org.jetbrains.android</depends>
+    <depends>org.jetbrains.kotlin</depends>
+    <depends>com.intellij.modules.xml</depends>
+
+    <extensions defaultExtensionNs="org.jetbrains.kotlin">
+        <supportsKotlinPluginMode supportsK2="true"/>
+    </extensions>
+
+    <actions>
+        <action id="com.yndongyong.bindview.GenerateBindViewAction"
+                class="com.yndongyong.bindview.action.GenerateBindViewAction"
+                text="Generate BindView"
+                description="Generate bindView property delegation code"
+                icon="AllIcons.FileTypes.Xml">
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="GenerateGroup"/>
+            <add-to-group group-id="GenerateGroup" anchor="first"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl I"/>
+        </action>
+    </actions>
+
+</idea-plugin>

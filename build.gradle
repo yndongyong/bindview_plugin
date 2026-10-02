@@ -1,0 +1,72 @@
+plugins {
+    id 'java'
+    id 'org.jetbrains.kotlin.jvm' version '2.0.0'
+    id 'org.jetbrains.intellij.platform' version '2.7.1'
+}
+
+group 'com.yndongyong.van'
+version '1.0.0'
+
+repositories {
+    maven {
+        url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/'
+    }
+    mavenCentral()
+    intellijPlatform {
+        defaultRepositories()
+    }
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
+tasks.runIde {
+    jvmArgs = ["-Xmx4096m", "-XX:+UnlockDiagnosticVMOptions"]
+}
+
+dependencies {
+    intellijPlatform {
+        bundledPlugin("org.jetbrains.android")
+        bundledPlugin("com.intellij.java")
+        bundledPlugin("org.jetbrains.kotlin")
+
+        instrumentationTools()
+        if (project.hasProperty("StudioRunPath")) {
+            local(property("StudioRunPath").toString())
+        } else {
+            androidStudio(property("ideVersion").toString())
+            bundledPlugin("org.jetbrains.android")
+        }
+    }
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+}
+
+intellijPlatform {
+    pluginConfiguration {
+        ideaVersion.sinceBuild = "211"
+        ideaVersion.untilBuild = ""
+        changeNotes = '''
+        <b>1.0.0</b><br>
+        <ul>
+            <li>支持通过 bindview 语法自动生成 Kotlin 属性委托视图绑定代码</li>
+            <li>支持 private、add "m"、isCamelCase 等选项配置与持久化</li>
+            <li>支持 XML 布局中一键复制，以及 Kotlin 类中直接生成/复制代码</li>
+        </ul>
+        '''
+    }
+}
+
+// 非常重要，不然 buildPlugin 会可能失败
+buildSearchableOptions {
+    enabled = false
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}
