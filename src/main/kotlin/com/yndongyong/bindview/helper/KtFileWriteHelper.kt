@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.codeStyle.CodeStyleManager
 import com.yndongyong.bindview.model.ViewInfo
 import com.yndongyong.bindview.utils.getKotlinClass
 import org.jetbrains.kotlin.name.FqName
@@ -65,28 +66,31 @@ class KtFileWriteHelper(
                 psiFactory.createProperty(viewInfo.getBindViewCode(addM, isPrivate, isCamelCase))
             }.filter { !existingNames.contains(it.name) }
 
-            if (newPropertyList.isNotEmpty()) {
-                val firstProperty: PsiElement? = existingProperties.firstOrNull()
-                val toAfter = (firstProperty == null)
-                var e: PsiElement = firstProperty ?: body.lBrace ?: return@runWriteCommandAction
+            if (newPropertyList.isEmpty()) {
+                return@runWriteCommandAction
+            }
 
-                var index = 0
-                for (i in newPropertyList.indices) {
-                    val p = newPropertyList[i]
-                    if (toAfter) {
-                        e = body.addAfter(p, e)
-                        body.addBefore(psiFactory.createNewLine(2), e)
-                    } else {
-                        e = body.addBefore(p, e)
-                    }
-                    index = i + 1
-                    break
-                }
+            // 确定插入锚点（有属性则追加在最后一个属性后面，无属性则在 '{' 后面）
+            val anchor: PsiElement = existingProperties.lastOrNull() ?: body.lBrace ?: body
 
-                for (i in index until newPropertyList.size) {
-                    val p = newPropertyList[i]
-                    e = body.addAfter(p, e)
-                }
+            // 上方增加空行（两个换行）
+            var current: PsiElement = body.addAfter(psiFactory.createNewLine(2), anchor)
+
+            // 依次插入各个属性，属性之间单换行
+            val insertedProperties = mutableListOf<KtProperty>()
+            for (prop in newPropertyList) {
+                val added = body.addAfter(prop, current) as KtProperty
+                insertedProperties.add(added)
+                current = body.addAfter(psiFactory.createNewLine(1), added)
+            }
+
+            // 下方增加空行（再加一个换行）
+            body.addAfter(psiFactory.createNewLine(1), current)
+
+            // 自动代码格式化与缩进对齐
+            val codeStyleManager = CodeStyleManager.getInstance(project)
+            for (prop in insertedProperties) {
+                codeStyleManager.reformat(prop)
             }
         }
 
